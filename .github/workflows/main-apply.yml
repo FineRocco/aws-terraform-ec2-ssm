@@ -1,0 +1,52 @@
+name: "Terraform Apply (Main)"
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  terraform-apply:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::145250404945:role/GitHubActionsRole
+          aws-region: eu-west-1
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        working-directory: ./environments/dev
+        run: terraform init
+
+      - name: Terraform Apply
+        working-directory: ./environments/dev
+        run: terraform apply -auto-approve -no-color
+        env:
+          TF_VAR_db_password: ${{ secrets.AWS_DB_PASSWORD }}
+
+      - name: Extract ECR URL from Terraform Outputs
+        id: get-ecr-url
+        working-directory: ./environments/dev
+        run: |
+          ECR_URL=$(terraform output -raw ecr_repository_url)
+          echo "ECR_URL=$ECR_URL" >> $GITHUB_ENV
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, Tag, and Push Docker Image
+        working-directory: ./app
+        run: |
+          # Build the image using the dynamically fetched URL
+          docker build -t ${{ env.ECR_URL }}:latest .
+          
+          # Push the image to AWS ECR
+          docker push ${{ env.ECR_URL }}:latest
