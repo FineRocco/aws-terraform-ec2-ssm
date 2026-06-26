@@ -20,7 +20,7 @@ resource "aws_db_subnet_group" "db_subnet_group" {
 resource "aws_db_instance" "postgres" {
   identifier             = "${var.environment}-postgres-db"
   engine                 = "postgres"
-  engine_version         = "15.4"
+  engine_version         = "16"
   instance_class         = "db.t3.micro" 
   allocated_storage      = 20
   username               = "dbadmin"
