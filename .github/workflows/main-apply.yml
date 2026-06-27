@@ -75,6 +75,8 @@ jobs:
               "sudo docker rm flask-app || true",
               "sudo docker pull ${{ env.ECR_URL }}:latest",
               "sudo docker run -d --name flask-app -p 80:80 -e DB_HOST=${{ env.DB_ENDPOINT }} -e DB_PASSWORD=${{ env.DB_PASS }} ${{ env.ECR_URL }}:latest"
+              "sleep 5",
+              "sudo docker exec flask-app python /app/seed_db.py"
             ]' \
             --output text --query "Command.CommandId")
           
