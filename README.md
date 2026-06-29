@@ -186,3 +186,32 @@ This repository strictly separates Application Code, Deployment Lifecycle Script
 └── README.md                       # Master architecture document and efficiency assessment
 
 ```
+
+---
+
+## Deployment & Operations Guide
+
+Because this architecture relies on OpenID Connect (OIDC) and remote state locking, it requires a one-time manual bootstrap to establish trust between GitHub and AWS before the automated CI/CD pipeline can take over.
+
+### Prerequisites
+* An AWS Account with administrative access.
+* A GitHub Repository containing this code.
+* AWS CLI and Terraform installed on your local machine.
+
+### Phase 1: The Cloud Bootstrap (Local Execution)
+Before GitHub Actions can deploy your infrastructure, it needs a legal identity (IAM Role) and a place to store its memory (Terraform State).
+
+1. **Establish the OIDC Trust Bridge:**
+   Navigate to the bootstrap directory and apply the configuration to create the GitHub Actions IAM Role:
+   ```bash
+   cd tf-boostrap-backend
+   terraform init
+   terraform apply -auto-approve
+   ```
+   Take note of the github_actions_role_arn output.
+
+2. **Create the State Storage (Backend):**
+    Manually create (via AWS CLI or Console) an S3 bucket to hold the Terraform state and a DynamoDB table (with partition key LockID) to handle state locking.
+
+### Phase 2: Pipeline Configuration
+
