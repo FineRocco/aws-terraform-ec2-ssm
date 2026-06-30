@@ -197,21 +197,24 @@ Because this architecture relies on OpenID Connect (OIDC) and remote state locki
 * An AWS Account with administrative access.
 * A GitHub Repository containing this code.
 * AWS CLI and Terraform installed on your local machine.
+* Run `aws configure` locally with a temporary Access Key to authorize your terminal for the initial bootstrap.
 
 ### Phase 1: The Cloud Bootstrap (Local Execution)
 Before GitHub Actions can deploy your infrastructure, it needs a legal identity (IAM Role) and a place to store its memory (Terraform State).
 
-1. **Establish the OIDC Trust Bridge:**
-   Navigate to the bootstrap directory and apply the configuration to create the GitHub Actions IAM Role:
+1. **Configure the OIDC Trust Policy:**
+   Before applying the bootstrap, you must update the OIDC Trust Policy to point to your specific GitHub repository so AWS knows who to trust. 
+   > Open `tf-boostrap-backend/main.tf`, locate the `Condition` block inside the IAM Role, and change `FineRocco` to your exact GitHub username:
+   > `"token.actions.githubusercontent.com:sub" = "repo:<YOUR_GITHUB_USERNAME>/aws-terraform-ec2-codedeploy:*"`
+
+2. **Establish the OIDC Trust Bridge:**
+   Navigate to the bootstrap directory and apply the configuration to create the GitHub Actions IAM Role, the S3 Bucket with versioning enabled and DynamoDB with state locking:
    ```bash
    cd tf-boostrap-backend
    terraform init
    terraform apply -auto-approve
    ```
    Take note of the github_actions_role_arn output.
-
-2. **Create the State Storage (Backend):**
-    Manually create (via AWS CLI or Console) an S3 bucket to hold the Terraform state and a DynamoDB table (with partition key LockID) to handle state locking.
 
 ### Phase 2: Pipeline Alignment
 Because OIDC relies on AWS-side trust policies rather than hidden keys, no GitHub Secrets are needed. You simply need to align your configuration files:
@@ -262,4 +265,11 @@ Once CodeDeploy finishes, extract the public IP of your EC2 instance from the Te
   ```
 
 6. Delete the OIDC Identity Provider and IAM Role via the AWS Console.
+
+   ```bash
+   aws iam detach-role-policy --role-name <YOUR_ROLE_NAME> --policy-arn <YOUR_POLICY_ARN>
+   aws iam delete-role --role-name <YOUR_ROLE_NAME>
+   aws iam delete-open-id-connect-provider --open-id-connect-provider-arn <YOUR_OIDC_PROVIDER_ARN>
+   ```
+   
   
