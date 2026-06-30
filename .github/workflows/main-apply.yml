@@ -69,16 +69,31 @@ jobs:
         run: |
           aws s3 cp deploy-${{ github.sha }}.zip s3://${{ env.ARTIFACT_BUCKET }}/deploy-${{ github.sha }}.zip
 
-      - name: Trigger AWS CodeDeploy
+      - name: Deploy via AWS Systems Manager (SSM)
         run: |
-          DEPLOYMENT_ID=$(aws deploy create-deployment \
-            --application-name dev-flask-app-deploy \
-            --deployment-group-name dev-deployment-group \
-            --s3-location bucket=${{ env.ARTIFACT_BUCKET }},key=deploy-${{ github.sha }}.zip,bundleType=zip \
-            --query "deploymentId" --output text)
-            
-          echo "CodeDeploy triggered with ID: $DEPLOYMENT_ID"
-          
-          aws deploy wait deployment-successful --deployment-id $DEPLOYMENT_ID
-          
-          echo "CodeDeploy deployment successfully rolled out to EC2!"
+          # 1. Extract dynamic variables from Terraform state
+          INSTANCE_ID=$(terraform output -raw ec2_instance_id)
+          DB_HOST=$(terraform output -raw db_endpoint)
+          ECR_URL=$(terraform output -raw ecr_repository_url)
+
+          echo "Triggering SSM Run Command on Instance: $INSTANCE_ID"
+
+          # 2. Push the deployment commands directly to the secure EC2 boundary
+          aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands=[ \
+              "echo 'Authenticating with ECR...'", \
+              "aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $ECR_URL", \
+              "echo 'Pulling latest image...'", \
+              "docker pull $ECR_URL:latest", \
+              "echo 'Fetching Zero-Knowledge credentials and starting container...'", \
+              "RAW_SECRET=\$(aws secretsmanager get-secret-value --secret-id dev-postgres-credentials --query SecretString --output text --region eu-west-1)", \
+              "PARSED_PASS=\$(echo \$RAW_SECRET | jq -r .password)", \
+              "docker stop flask-app || true", \
+              "docker rm flask-app || true", \
+              "docker run -d --name flask-app -p 80:80 -e DB_HOST=$DB_HOST -e DB_USER=dbadmin -e DB_NAME=postgres -e DB_PASS=\"\$PARSED_PASS\" $ECR_URL:latest", \
+              "sleep 15", \
+              "docker exec flask-app python /app/seed_db.py" \
+            ] \
+            --comment "Automated CI/CD Deployment via SSM"
