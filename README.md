@@ -251,25 +251,9 @@ Once CodeDeploy finishes, extract the public IP of your EC2 instance from the Te
   terraform destroy -auto-approve
   ```
 
-4. Delete the Terraform State S3 Bucket:
-
   ```bash
-  aws s3 rm s3://<YOUR_TF_STATE_BUCKET_NAME> --recursive
-  aws s3api delete-bucket --bucket <YOUR_TF_STATE_BUCKET_NAME> --region eu-west-1
+  cd tf-bootstrap-backend
+  terraform destroy -auto-approve
   ```
-
-5. Delete the DynamoDB Lock Table:
-
-  ```bash
-  aws dynamodb delete-table --table-name terraform-state-lock --region eu-west-1
-  ```
-
-6. Delete the OIDC Identity Provider and IAM Role via the AWS Console.
-
- ```bash
- aws iam detach-role-policy --role-name <YOUR_ROLE_NAME> --policy-arn <YOUR_POLICY_ARN>
- aws iam delete-role --role-name <YOUR_ROLE_NAME>
- aws iam delete-open-id-connect-provider --open-id-connect-provider-arn <YOUR_OIDC_PROVIDER_ARN>
- ```
    
   
