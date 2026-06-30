@@ -38,10 +38,8 @@ jobs:
         working-directory: ./env/dev
         run: |
           ECR_URL=$(terraform output -raw ecr_repository_url)
-          ARTIFACT_BUCKET=$(terraform output -raw codedeploy_s3_bucket)
           
           echo "ECR_URL=$ECR_URL" >> $GITHUB_ENV
-          echo "ARTIFACT_BUCKET=$ARTIFACT_BUCKET" >> $GITHUB_ENV
 
       - name: Login to Amazon ECR
         id: login-ecr
