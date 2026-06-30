@@ -51,22 +51,6 @@ jobs:
           docker build -t ${{ env.ECR_URL }}:latest .
           docker push ${{ env.ECR_URL }}:latest
 
-      - name: Package CodeDeploy Artifact
-        run: |
-          mkdir -p deployment_artifact~
-
-          echo "ECR_URL=${{ env.ECR_URL }}" >> deployment_artifact/.env
-          echo "DB_HOST=${{ env.DB_HOST }}" >> deployment_artifact/.env
-          
-          cp appspec.yml deployment_artifact/
-          cp -r scripts/ deployment_artifact/
-          cd deployment_artifact
-          zip -r ../deploy-${{ github.sha }}.zip .
-
-      - name: Upload Artifact to S3
-        run: |
-          aws s3 cp deploy-${{ github.sha }}.zip s3://${{ env.ARTIFACT_BUCKET }}/deploy-${{ github.sha }}.zip
-
       - name: Deploy via AWS Systems Manager (SSM)
         run: |
           # 1. Extract dynamic variables from Terraform state
