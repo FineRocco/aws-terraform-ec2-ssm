@@ -6,7 +6,6 @@ import string
 alphabet = string.ascii_letters + string.digits + "!@#$%^&*"
 random_password = ''.join(secrets.choice(alphabet) for i in range(16))
 
-# 2. Connect to AWS RDS
 conn = psycopg2.connect(
     host=os.environ.get('DB_HOST'),
     database=os.environ.get('DB_NAME'),
@@ -16,7 +15,6 @@ conn = psycopg2.connect(
 )
 cursor = conn.cursor()
 
-# 3. Create the table
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS my_secrets (
     id SERIAL PRIMARY KEY,
