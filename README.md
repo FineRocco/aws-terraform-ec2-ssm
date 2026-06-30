@@ -266,10 +266,10 @@ Once CodeDeploy finishes, extract the public IP of your EC2 instance from the Te
 
 6. Delete the OIDC Identity Provider and IAM Role via the AWS Console.
 
-   ```bash
-   aws iam detach-role-policy --role-name <YOUR_ROLE_NAME> --policy-arn <YOUR_POLICY_ARN>
-   aws iam delete-role --role-name <YOUR_ROLE_NAME>
-   aws iam delete-open-id-connect-provider --open-id-connect-provider-arn <YOUR_OIDC_PROVIDER_ARN>
-   ```
+ ```bash
+ aws iam detach-role-policy --role-name <YOUR_ROLE_NAME> --policy-arn <YOUR_POLICY_ARN>
+ aws iam delete-role --role-name <YOUR_ROLE_NAME>
+ aws iam delete-open-id-connect-provider --open-id-connect-provider-arn <YOUR_OIDC_PROVIDER_ARN>
+ ```
    
   
