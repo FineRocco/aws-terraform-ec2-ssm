@@ -9,7 +9,7 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
-*.lock.*
+.terraform.lock.hcl
 
 __pycache__/
 *.py[cod]
