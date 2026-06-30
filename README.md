@@ -1,4 +1,4 @@
-# Zero-Knowledge Cloud-Native Web & Database Stack
+# Cloud-Native Web & Database Stack
 
 An immutable, fully automated DevSecOps cloud infrastructure project. This repository provisions a secure, two-tier AWS network topology, deploys a containerized Python/Flask application, attaches a zero-trust encrypted PostgreSQL database, and orchestrates zero-touch CI/CD deployments via AWS CodeDeploy—all authenticated seamlessly via OpenID Connect (OIDC).
 
@@ -197,21 +197,24 @@ Because this architecture relies on OpenID Connect (OIDC) and remote state locki
 * An AWS Account with administrative access.
 * A GitHub Repository containing this code.
 * AWS CLI and Terraform installed on your local machine.
+* Run `aws configure` locally with a temporary Access Key to authorize your terminal for the initial bootstrap.
 
 ### Phase 1: The Cloud Bootstrap (Local Execution)
 Before GitHub Actions can deploy your infrastructure, it needs a legal identity (IAM Role) and a place to store its memory (Terraform State).
 
-1. **Establish the OIDC Trust Bridge:**
-   Navigate to the bootstrap directory and apply the configuration to create the GitHub Actions IAM Role:
+1. **Configure the OIDC Trust Policy:**
+   Before applying the bootstrap, you must update the OIDC Trust Policy to point to your specific GitHub repository so AWS knows who to trust. 
+   > Open `tf-boostrap-backend/main.tf`, locate the `Condition` block inside the IAM Role, and change `FineRocco` to your exact GitHub username:
+   > `"token.actions.githubusercontent.com:sub" = "repo:<YOUR_GITHUB_USERNAME>/aws-terraform-ec2-codedeploy:*"`
+
+2. **Establish the OIDC Trust Bridge:**
+   Navigate to the bootstrap directory and apply the configuration to create the GitHub Actions IAM Role, the S3 Bucket with versioning enabled and DynamoDB with state locking:
    ```bash
    cd tf-boostrap-backend
    terraform init
    terraform apply -auto-approve
    ```
    Take note of the github_actions_role_arn output.
-
-2. **Create the State Storage (Backend):**
-    Manually create (via AWS CLI or Console) an S3 bucket to hold the Terraform state and a DynamoDB table (with partition key LockID) to handle state locking.
 
 ### Phase 2: Pipeline Alignment
 Because OIDC relies on AWS-side trust policies rather than hidden keys, no GitHub Secrets are needed. You simply need to align your configuration files:
@@ -248,18 +251,9 @@ Once CodeDeploy finishes, extract the public IP of your EC2 instance from the Te
   terraform destroy -auto-approve
   ```
 
-4. Delete the Terraform State S3 Bucket:
-
   ```bash
-  aws s3 rm s3://<YOUR_TF_STATE_BUCKET_NAME> --recursive
-  aws s3api delete-bucket --bucket <YOUR_TF_STATE_BUCKET_NAME> --region eu-west-1
+  cd tf-bootstrap-backend
+  terraform destroy -auto-approve
   ```
-
-5. Delete the DynamoDB Lock Table:
-
-  ```bash
-  aws dynamodb delete-table --table-name terraform-state-lock --region eu-west-1
-  ```
-
-6. Delete the OIDC Identity Provider and IAM Role via the AWS Console.
+   
   
