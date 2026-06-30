@@ -1,4 +1,4 @@
-# Zero-Knowledge Cloud-Native Web & Database Stack
+# Cloud-Native Web & Database Stack
 
 An immutable, fully automated DevSecOps cloud infrastructure project. This repository provisions a secure, two-tier AWS network topology, deploys a containerized Python/Flask application, attaches a zero-trust encrypted PostgreSQL database, and orchestrates zero-touch CI/CD deployments via AWS CodeDeploy—all authenticated seamlessly via OpenID Connect (OIDC).
 
