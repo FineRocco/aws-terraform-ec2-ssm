@@ -1,6 +1,6 @@
 # Cloud-Native Web & Database Stack
 
-An immutable, fully automated DevSecOps cloud infrastructure project. This repository provisions a secure, two-tier AWS network topology, deploys a containerized Python/Flask application, attaches a zero-trust encrypted PostgreSQL database, and orchestrates zero-touch CI/CD deployments via AWS CodeDeploy—all authenticated seamlessly via OpenID Connect (OIDC).
+An immutable, fully automated DevSecOps cloud infrastructure project. This repository provisions a secure, two-tier AWS network topology, deploys a containerized Python/Flask application, attaches a zero-trust encrypted PostgreSQL database, and orchestrates zero-touch, push-based CI/CD deployments via AWS Systems Manager (SSM)—all authenticated seamlessly via OpenID Connect (OIDC).
 
 ---
 
@@ -9,7 +9,7 @@ An immutable, fully automated DevSecOps cloud infrastructure project. This repos
 This project integrates five distinct technology layers to create a highly efficient, automated security gate pipeline:
 
 * **Infrastructure as Code (IaC):** Terraform (State managed via AWS S3 Backend)
-* **Cloud Provider (AWS):** VPC, EC2, RDS PostgreSQL, ECR, S3, Secrets Manager, CodeDeploy, IAM (OIDC)
+* **Cloud Provider (AWS):** VPC, EC2, RDS PostgreSQL, ECR, S3, Secrets Manager, SSM, IAM (OIDC)
 * **CI/CD Orchestration:** GitHub Actions
 * **Containerization:** Docker
 * **Application Layer:** Python 3.11, Flask, psycopg2-binary, Bash (Lifecycle Scripts)
@@ -18,48 +18,47 @@ This project integrates five distinct technology layers to create a highly effic
 
 ## System Architecture
 
-This architecture relies on a "Pull-based" deployment lifecycle. Rather than pushing commands directly to a server, the CI/CD pipeline packages instructions and delegates the execution to a local CodeDeploy agent residing within the secure network boundary.
+This architecture relies on a highly secure "Push-based" deployment lifecycle using AWS Systems Manager (SSM). Rather than exposing SSH ports or managing complex CodeDeploy agents with S3 artifact buckets, the CI/CD pipeline uses AWS SSM to securely tunnel execution commands directly into the EC2 instance boundary.
 
 ```text
                               [ Public Internet ]
-                                       │ (HTTP :80)
-                                       ▼
-                             ┌───────────────────┐
-                             │  AWS Internet GW  │
-                             └─────────┬─────────┘
-                                       │
-                 ┌─────────────────────┴─────────────────────┐
-                 │                  AWS VPC                  │
-                 │                                           │
-                 │  ┌─────────────────────────────────────┐  │
-                 │  │ Public Subnet (DMZ)                 │  │
-                 │  │                                     │  │
-                 │  │   ┌─────────────────────────────┐   │  │
-                 │  │   │       EC2 Web Server        │◄──┼──┐ (4) Agent 
-                 │  │   │    (CodeDeploy Agent)       │   │  │     Pulls
-                 │  │   └──────────────┬──────────────┘   │  │     Artifact
-                 │  └──────────────────┼──────────────────┘  │       │
-                 │                     │ (TCP :5432)         │       │
-                 │  ┌──────────────────▼──────────────────┐  │       │
-                 │  │ Private Subnets (Multi-AZ Isolated) │  │       │
-                 │  │                                     │  │       │
-                 │  │   ┌─────────────────────────────┐   │  │       │
-                 │  │   │   AWS RDS PostgreSQL DB     │   │  │       │
-                 │  │   └─────────────────────────────┘   │  │       │
-                 │  └─────────────────────────────────────┘  │       │
-                 └───────────────────────────────────────────┘       │
-                                                                     │
-  =========================== CI/CD CONTROL PLANE ===================│=========
-                                                                     │
-      ┌────────────────┐ (1) OIDC Auth  ┌───────────────┐            │
-      │ GitHub Actions ├───────────────►│ AWS IAM Role  │            │
-      └──────┬─────────┘                └───────────────┘            │
-             │                                                       │
-             ├─────────────────► [ AWS ECR ] (2) Push Docker Image   │
-             │                                                       │
-             ├─────────────────► [ AWS S3  ] (3) Upload appspec.zip ─┘
-             │                                                       │
-             └─────────────────► [ AWS CodeDeploy ] (Triggers EC2 Agent)
+                                     │ (HTTP :80)
+                                     ▼
+                            ┌───────────────────┐
+                            │   AWS Internet GW │
+                            └─────────┬─────────┘
+                                      │
+                ┌─────────────────────┴─────────────────────┐
+                │                   AWS VPC                 │
+                │                                           │
+                │  ┌─────────────────────────────────────┐  │
+                │  │ Public Subnet (DMZ)                 │  │
+                │  │                                     │  │
+                │  │   ┌─────────────────────────────┐   │  │ (4) SSM Run Command
+                │  │   │       EC2 Web Server        │◄──┼──┼─────┐ Pushes Bash
+                │  │   │   (SSM Agent / Docker)      │   │  │     │ instructions
+                │  │   └───────┬─────────────┬───────┘   │  │     │ directly to EC2
+                │  └───────────┼─────────────┼───────────┘  │     │
+                │              │(TCP :5432)  │ (HTTPS)      │     │
+                │  ┌───────────▼─────────────▼───────────┐  │     │
+                │  │ Private Subnets (Multi-AZ Isolated) │  │     │
+                │  │                                     │  │     │
+                │  │   ┌───────────────┐ ┌───────────┐   │  │     │
+                │  │   │    AWS RDS    │ │AWS Secrets│◄──┼──┼─(5) EC2 fetches DB
+                │  │   │ PostgreSQL DB │ │  Manager  │   │  │     password into memory
+                │  │   └───────────────┘ └───────────┘   │  │     at container runtime
+                │  └─────────────────────────────────────┘  │     │
+                └───────────────────────────────────────────┘     │
+                                                                  │
+=========================== CI/CD CONTROL PLANE ==================│========
+                                                                  │
+      ┌────────────────┐ (1) OIDC Auth  ┌───────────────┐         │
+      │ GitHub Actions ├───────────────►│ AWS IAM Role  │         │
+      └──────┬─────────┘                └───────────────┘         │
+             │                                                    │
+             ├─────────────────► [ AWS ECR ] (2) Push Docker Image│
+             │                                                    │
+             └─────────────────► [ AWS SSM ] (3) Triggers script ─┘
 
 ```
 
@@ -103,11 +102,10 @@ In a production-grade CI/CD environment, infrastructure state cannot reside loca
 
 ## Key DevSecOps & OPSEC Principles
 
-1. **Zero-Knowledge Secret Injection:** The PostgreSQL master password is dynamically generated at high entropy via Terraform (`random_password`) and injected directly into **AWS Secrets Manager**. GitHub Actions never reads, caches, or echoes this password. During the AWS CodeDeploy lifecycle, the local EC2 agent uses its attached IAM Instance Profile to cryptographically pull the secret from the vault and parse it directly into container memory via `jq`.
+1. **Zero-Knowledge Secret Injection:** The PostgreSQL master password is dynamically generated at high entropy via Terraform (`random_password`) and injected directly into **AWS Secrets Manager**. GitHub Actions never reads, caches, or echoes this password. During the SSM deployment phase, the EC2 instance uses its attached IAM Instance Profile to cryptographically pull the secret from the vault and parse it directly into container memory via `jq`.
 2. **Keyless CI/CD Authentication:** GitHub Actions authenticates against AWS utilizing **OpenID Connect (OIDC)**. Long-lived, static `AWS_ACCESS_KEY_ID` secrets do not exist anywhere in this project's repositories or environments.
 3. **Bastionless Remote Access:** Because SSH Port 22 is explicitly disabled at the Security Group level, all debugging and administrative shell access is tunneled securely through **AWS Systems Manager (SSM) Session Manager**. This completely eliminates internet-facing SSH brute-force attack vectors.
-4. **Idempotent Lifecycle Rollouts:** Deployments do not require server teardowns or mutable infrastructure drift. GitHub Actions simply drops an artifact in S3 and delegates execution to the **AWS CodeDeploy Agent**. The agent reads the `appspec.yml` file to gracefully stop legacy containers, flush orphaned images, and spin up newly compiled containers natively.
-
+4. **Idempotent Lifecycle Rollouts:** Deployments do not require server teardowns or mutable infrastructure drift. Instead of relying on S3 artifact buckets or heavy deployment agents, GitHub Actions securely triggers an **AWS SSM Run Command**. The SSM agent natively executes the rollout instructions on the host to authenticate with ECR, pull the latest image, gracefully stop legacy containers, and spin up newly compiled containers.
 ---
 
 ## Automated CI/CD Lifecycle
@@ -116,25 +114,20 @@ When a developer merges code into the `main` branch, `.github/workflows/main-app
 
 ### Phase 1: Continuous Integration & Infrastructure (GitHub Actions)
 1. **OIDC Authentication:** The runner securely assumes the `GitHubActionsRole` in AWS via OpenID Connect.
-2. **Infrastructure IaC Gate:** Terraform initializes the remote S3 backend, acquires the DynamoDB state lock, and applies infrastructure changes (`-auto-approve`).
-3. **Variable Extraction:** The pipeline uses `terraform output -raw` to dynamically scrape the newly generated ECR Repository URL, RDS Endpoint, and CodeDeploy S3 Bucket name from the infrastructure state.
-4. **Artifact Compilation:** The lightweight `python:3.11-slim` Docker image is built and pushed to Amazon ECR.
-5. **The Ephemeral Bridge:** GitHub Actions dynamically writes a `.env` file containing the Terraform-generated database endpoints and ECR URLs. 
-6. **Artifact Packaging:** The `.env` file, Bash lifecycle scripts, and `appspec.yml` are zipped and uploaded to the S3 CodeDeploy bucket. GitHub Actions triggers the deployment and awaits a callback.
+2. **Infrastructure IaC Gate:** Terraform initializes the remote backend (utilizing native S3 state locking, eliminating the need for legacy DynamoDB tables) and applies infrastructure changes (`-auto-approve`).
+3. **Variable Extraction:** The pipeline uses `terraform output -raw` to dynamically scrape the newly generated EC2 Instance ID, RDS Endpoint, and ECR Repository URL directly from the active state file.
+4. **Artifact Compilation:** The lightweight Python/Flask Docker image is built, tagged, and pushed to Amazon ECR.
+5. **SSM Execution Trigger:** Instead of zipping artifacts or relying on deployment agents to pull data, GitHub Actions packages the deployment instructions and dynamic variables into a strictly formatted JSON payload, pushing the command directly to the EC2 instance via `aws ssm send-command`.
 
-### Phase 2: Continuous Deployment & Rollout (AWS CodeDeploy)
-Once triggered, the CodeDeploy Agent running securely inside the EC2 DMZ takes over execution based on the `appspec.yml` lifecycle hooks:
+### Phase 2: Continuous Deployment & Rollout (AWS Systems Manager)
+Once triggered, the SSM Agent running securely inside the EC2 DMZ executes the `AWS-RunShellScript` payload. This guarantees an idempotent, highly secure deployment lifecycle:
 
-1. **`ApplicationStop` Hook:**
-   * Executes `scripts/stop_container.sh`.
-   * Gracefully stops and removes the legacy `flask-app` container if it exists, ensuring an idempotent deployment environment.
-2. **`ApplicationStart` Hook:**
-   * Executes `scripts/start_container.sh`.
-   * **Sources Context:** Loads the dynamically generated `.env` file to locate the database and ECR endpoints.
-   * **Authenticates:** Uses the EC2 IAM Instance Profile to authenticate the local Docker daemon against AWS ECR.
-   * **Zero-Knowledge Extraction:** Quietly queries AWS Secrets Manager, utilizing `jq` to parse the raw JSON payload and extract the master database password without echoing it to any log files.
-   * **Container Boot:** Spins up the new Docker container bound to `80:80`, injecting the database credentials via environment variables (`-e`).
-   * **Database Seeding:** Pauses for container socket binding, then executes `seed_db.py` inside the live container to truncate legacy data, generate a new cryptographically secure random password, and write it to the PostgreSQL database.
+1. **Authentication:** Uses the EC2 IAM Instance Profile to seamlessly authenticate the local Docker daemon against AWS ECR.
+2. **Artifact Retrieval:** Pulls the newly compiled application container image directly from the private ECR registry.
+3. **Zero-Knowledge Extraction:** Quietly queries AWS Secrets Manager, utilizing `jq` to parse the raw JSON payload and extract the master database password directly into server memory, never writing it to a log or a local `.env` file.
+4. **Idempotent Reset:** Gracefully stops and removes the legacy `flask-app` container if it exists, ensuring a clean deployment slate.
+5. **Container Boot:** Spins up the new Docker container bound to port `80:80`, injecting the database credentials and endpoints securely via runtime environment variables (`-e`).
+6. **Database Seeding:** Pauses for container socket binding, then natively executes `seed_db.py` inside the live container to initialize the PostgreSQL schema and seed the application data.
   
 ---
   
@@ -146,16 +139,13 @@ This repository strictly separates Application Code, Deployment Lifecycle Script
 .
 ├── .github/
 │   └── workflows/
-│       ├── main-apply.yml          # Continuous Deployment pipeline & CodeDeploy trigger
+│       ├── main-apply.yml          # Continuous Deployment pipeline
 │       └── pr-plan.yml             # CI/CD security gate: Terraform plan & PR validation
 ├── app/
 │   ├── app.py                      # Flask web application & RDS Read route
 │   ├── seed_db.py                  # Auto-seeder with cryptographic password generation
 │   ├── Dockerfile                  # Python 3.11 slim container build instructions
 │   └── requirements.txt            # Python dependencies (Flask, psycopg2-binary)
-├── scripts/
-│   ├── start_container.sh          # CodeDeploy ApplicationStart hook (Pull, Auth, Run)
-│   └── stop_container.sh           # CodeDeploy ApplicationStop hook (Graceful teardown)
 ├── env/
 │   ├── dev/
 │   │   ├── main.tf                 # Root module instantiation for the Development environment
@@ -174,18 +164,27 @@ This repository strictly separates Application Code, Deployment Lifecycle Script
 ├── modules/
 │   └── web_database_stack/
 │       ├── network.tf              # VPC, DMZ Subnets, Private Subnets, Route Tables
-│       ├── main.tf                 # Core infra (EC2, RDS, ECR, Secrets, CodeDeploy Agent)
+│       ├── main.tf                 # Core infra (EC2, RDS, ECR, Secrets)
 │       ├── security.tf             # IAM Roles, Policies, Instance Profiles
-│       ├── codedeploy.tf           # CodeDeploy App, Deployment Group, Artifact S3 Bucket
 │       ├── variables.tf            # Dynamic module input variables
 │       └── outputs.tf              # Module attribute pitchers to pass data upstream
 ├── tf-boostrap-backend/
 │   └── main.tf                     # OIDC Identity Provider & GitHub Actions IAM Role setup
-├── appspec.yml                     # AWS CodeDeploy instruction manual and hook mapping
 ├── .gitignore                      # Ignores local .terraform directories and .env files
 └── README.md                       # Master architecture document and efficiency assessment
 
 ```
+
+---
+
+## Challenges & Architectural Pivots
+
+Building a fully automated DevSecOps pipeline from scratch presented several real-world cloud engineering challenges. Documenting these roadblocks highlights the resilience and adaptability of the final architecture.
+
+### 1. AWS Free Tier & The CodeDeploy Restriction
+* **The Blocker:** During the final stages of the CI/CD pipeline rollout, Terraform successfully built the infrastructure, but the pipeline crashed with a `SubscriptionRequiredException` when attempting to provision AWS CodeDeploy.
+* **The Cause:** Newly created AWS Free Tier accounts (and academic sandbox environments) often place hard restrictions on peripheral deployment services like CodeDeploy until the account undergoes background verification to prevent abuse. 
+* **The Pivot (SSM Run Command):** Rather than wait for account verification, the architecture was pivoted from a "Pull" deployment model (CodeDeploy + S3 Artifacts) to a strictly secure "Push" model using **AWS Systems Manager (SSM)**. This completely eliminated the need for S3 artifact storage and CodeDeploy agents. Instead, GitHub Actions uses the OIDC bridge to trigger an SSM Run Command, injecting the zero-knowledge database credentials and booting the Docker container natively. This resulted in a lighter, faster, and equally secure deployment that operates perfectly within Free Tier constraints.
 
 ---
 
@@ -204,8 +203,8 @@ Before GitHub Actions can deploy your infrastructure, it needs a legal identity 
 
 1. **Configure the OIDC Trust Policy:**
    Before applying the bootstrap, you must update the OIDC Trust Policy to point to your specific GitHub repository so AWS knows who to trust. 
-   > Open `tf-boostrap-backend/main.tf`, locate the `Condition` block inside the IAM Role, and change `FineRocco` to your exact GitHub username:
-   > `"token.actions.githubusercontent.com:sub" = "repo:<YOUR_GITHUB_USERNAME>/aws-terraform-ec2-codedeploy:*"`
+   > Open `tf-boostrap-backend/main.tf`, locate the `Condition` block inside the IAM Role, and change the placeholder to your exact GitHub username and repository name:
+   > `"token.actions.githubusercontent.com:sub" = "repo:<YOUR_GITHUB_USERNAME>/<YOUR_REPOSITORY_NAME>:*"`
 
 2. **Establish the OIDC Trust Bridge:**
    Navigate to the bootstrap directory and apply the configuration to create the GitHub Actions IAM Role, the S3 Bucket with versioning enabled and DynamoDB with state locking:
@@ -231,19 +230,13 @@ Once CodeDeploy finishes, extract the public IP of your EC2 instance from the Te
 
 ## Teardown Protocol
 
-1. Purge the S3 CodeDeploy Artifacts:
-   
-  ```bash
-  aws s3 rm s3://<YOUR_CODEDEPLOY_BUCKET_NAME> --recursive
-  ```
-
-2. Purge the ECR Image Registry:
+1. Purge the ECR Image Registry:
 
   ```bash
   aws ecr batch-delete-image --repository-name dev-flask-app --image-ids imageTag=latest --region eu-west-1
   ```
 
-3. Destroy the Infrastructure:
+2. Destroy the Infrastructure:
 
   ```bash
   cd env/dev
