@@ -55,7 +55,7 @@ jobs:
         working-directory: ./env/dev
         run: |
           # 1. Extract dynamic variables from Terraform state
-          INSTANCE_ID=$(terraform output -raw ec2_instance_id)
+          INSTANCE_ID=$(terraform output -raw dev_ec2_instance_id)
           DB_HOST=$(terraform output -raw dev_db_endpoint)
           ECR_URL=$(terraform output -raw ecr_repository_url)
 
