@@ -105,7 +105,6 @@ In a production-grade CI/CD environment, infrastructure state cannot reside loca
 1. **Zero-Knowledge Secret Injection:** The PostgreSQL master password is dynamically generated at high entropy via Terraform (`random_password`) and injected directly into **AWS Secrets Manager**. GitHub Actions never reads, caches, or echoes this password. During the SSM deployment phase, the EC2 instance uses its attached IAM Instance Profile to cryptographically pull the secret from the vault and parse it directly into container memory via `jq`.
 2. **Keyless CI/CD Authentication:** GitHub Actions authenticates against AWS utilizing **OpenID Connect (OIDC)**. Long-lived, static `AWS_ACCESS_KEY_ID` secrets do not exist anywhere in this project's repositories or environments.
 3. **Bastionless Remote Access:** Because SSH Port 22 is explicitly disabled at the Security Group level, all debugging and administrative shell access is tunneled securely through **AWS Systems Manager (SSM) Session Manager**. This completely eliminates internet-facing SSH brute-force attack vectors.
-4. **Idempotent Lifecycle Rollouts:** Deployments do not require server teardowns or mutable infrastructure drift. Instead of relying on S3 artifact buckets or heavy deployment agents, GitHub Actions securely triggers an **AWS SSM Run Command**. The SSM agent natively executes the rollout instructions on the host to authenticate with ECR, pull the latest image, gracefully stop legacy containers, and spin up newly compiled containers.
 ---
 
 ## Automated CI/CD Lifecycle
