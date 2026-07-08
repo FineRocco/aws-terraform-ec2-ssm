@@ -12,7 +12,7 @@ This project integrates five distinct technology layers to create a highly effic
 * **Cloud Provider (AWS):** VPC, EC2, RDS PostgreSQL, ECR, S3, Secrets Manager, SSM, IAM (OIDC)
 * **CI/CD Orchestration:** GitHub Actions
 * **Containerization:** Docker
-* **Application Layer:** Python 3.11, Flask, psycopg2-binary, Bash (Lifecycle Scripts)
+* **Application Layer:** Python 3.11, Flask, psycopg2-binary, Bash
 
 ---
 
