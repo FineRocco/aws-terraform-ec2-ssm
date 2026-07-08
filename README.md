@@ -109,7 +109,7 @@ In a production-grade CI/CD environment, infrastructure state cannot reside loca
 
 ## Automated CI/CD Lifecycle
 
-When a developer merges code into the `main` branch, `.github/workflows/main-apply.yml` triggers a deterministic, zero-touch deployment pipeline. The lifecycle is strictly divided between GitHub Actions (Push) and the AWS CodeDeploy Agent (Pull).
+When a developer merges code into the `main` branch, `.github/workflows/main-apply.yml` triggers a deterministic, zero-touch deployment pipeline. The lifecycle is strictly divided between GitHub Actions (Push) and the AWS SSM (Push).
 
 ### Phase 1: Continuous Integration & Infrastructure (GitHub Actions)
 1. **OIDC Authentication:** The runner securely assumes the `GitHubActionsRole` in AWS via OpenID Connect.
