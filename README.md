@@ -8,7 +8,7 @@ An immutable, fully automated DevSecOps cloud infrastructure project. This repos
 
 This project integrates five distinct technology layers to create a highly efficient, automated security gate pipeline:
 
-* **Infrastructure as Code (IaC):** Terraform (State managed via AWS S3 Backend)
+* **Infrastructure as Code (IaC):** Terraform (State managed via AWS S3 Backend with DynamoDB)
 * **Cloud Provider (AWS):** VPC, EC2, RDS PostgreSQL, ECR, S3, Secrets Manager, SSM, IAM (OIDC)
 * **CI/CD Orchestration:** GitHub Actions
 * **Containerization:** Docker
@@ -70,7 +70,7 @@ This architecture employs a strict two-tier Virtual Private Cloud (VPC) design, 
 
 * **Internet Gateway (IGW):** The foundational ingress/egress anchor attached to the edge of the VPC. It translates internal private IP addresses to public routable addresses, acting as the sole bridge between the AWS network and the public internet.
 * **Public Subnet (DMZ):** Houses the EC2 Web Server. 
-  * **Routing:** Governed by a Public Route Table that directs all outbound intern traffic (et`0.0.0.0/0`) directly to the Internet Gateway.
+  * **Routing:** Governed by a Public Route Table that directs all outbound intern traffic (`0.0.0.0/0`) directly to the Internet Gateway.
   * **Access:** Equipped with a public IP to serve HTTP traffic directly to external users.
 * **Private Subnets (x2):** Houses the AWS RDS PostgreSQL instance. Spans two distinct Availability Zones (`eu-west-1a`, `eu-west-1b`) to satisfy AWS physical failover mandates.
 
@@ -139,7 +139,8 @@ This repository strictly separates Application Code, Deployment Lifecycle Script
 ├── .github/
 │   └── workflows/
 │       ├── main-apply.yml          # Continuous Deployment pipeline
-│       └── pr-plan.yml             # CI/CD security gate: Terraform plan & PR validation
+│       ├── pr-plan.yml             # CI/CD security gate: Terraform plan & PR validation
+│       └── teardown.yaml           # Automated cleanup and infrastructure destruction
 ├── app/
 │   ├── app.py                      # Flask web application & RDS Read route
 │   ├── seed_db.py                  # Auto-seeder with cryptographic password generation
@@ -167,7 +168,7 @@ This repository strictly separates Application Code, Deployment Lifecycle Script
 │       ├── security.tf             # IAM Roles, Policies, Instance Profiles
 │       ├── variables.tf            # Dynamic module input variables
 │       └── outputs.tf              # Module attribute pitchers to pass data upstream
-├── tf-boostrap-backend/
+├── tf-bootstrap-backend/
 │   └── main.tf                     # OIDC Identity Provider & GitHub Actions IAM Role setup
 ├── .gitignore                      # Ignores local .terraform directories and .env files
 └── README.md                       # Master architecture document and efficiency assessment
@@ -202,13 +203,13 @@ Before GitHub Actions can deploy your infrastructure, it needs a legal identity 
 
 1. **Configure the OIDC Trust Policy:**
    Before applying the bootstrap, you must update the OIDC Trust Policy to point to your specific GitHub repository so AWS knows who to trust. 
-   > Open `tf-boostrap-backend/main.tf`, locate the `Condition` block inside the IAM Role, and change the placeholder to your exact GitHub username and repository name:
+   > Open `tf-bootstrap-backend/main.tf`, locate the `Condition` block inside the IAM Role, and change the placeholder to your exact GitHub username and repository name:
    > `"token.actions.githubusercontent.com:sub" = "repo:<YOUR_GITHUB_USERNAME>/<YOUR_REPOSITORY_NAME>:*"`
 
 2. **Establish the OIDC Trust Bridge:**
    Navigate to the bootstrap directory and apply the configuration to create the GitHub Actions IAM Role and the S3 Bucket:
    ```bash
-   cd tf-boostrap-backend
+   cd tf-bootstrap-backend
    terraform init
    terraform apply -auto-approve
    ```
@@ -221,7 +222,7 @@ Because OIDC relies on AWS-side trust policies rather than hidden keys, no GitHu
 
 2. **Backend Configuration:** Update `env/dev/backend.tf` and `env/prod/backend.tf` to point to the exact S3 bucket and DynamoDB table you created in Phase 1.
 
-### Phase 3: Verify the Application:
+### Phase 3: Verify the Application
 
 Extract the public IP of your EC2 instance from the Terraform outputs or the AWS Console. Visit it in your browser (`http://<EC2_PUBLIC_IP>`) to see your zero-knowledge database secret retrieved live!
 
@@ -229,19 +230,17 @@ Extract the public IP of your EC2 instance from the Terraform outputs or the AWS
 
 ## Teardown Protocol
 
-1. Purge the ECR Image Registry:
+1. **Automated Infrastructure Teardown:**
 
-  ```bash
-  aws ecr batch-delete-image --repository-name dev-flask-app --image-ids imageTag=latest --region eu-west-1
-  ```
+* Navigate to your repository on GitHub.com.
 
-2. Destroy the Infrastructure:
+* Click the **Actions** tab.
 
-  ```bash
-  cd env/dev
-  terraform init
-  terraform destroy -auto-approve
-  ```
+* Select the **Destroy Infrastructure** workflow on the left.
+
+* Click the **Run workflow** dropdown and execute it.
+
+2. **Destroy the Cloud Bootstrap (Local Execution):**
 
   ```bash
   cd tf-bootstrap-backend
