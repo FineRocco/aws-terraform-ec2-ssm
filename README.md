@@ -217,13 +217,13 @@ Before GitHub Actions can deploy your infrastructure, it needs a legal identity 
 ### Phase 2: Pipeline Alignment
 Because OIDC relies on AWS-side trust policies rather than hidden keys, no GitHub Secrets are needed. You simply need to align your configuration files:
 
-1. **GitHub Actions YAML:** Open .github/workflows/main-apply.yml and .github/workflows/pr-plan.yml. Update the role-to-assume parameter with the IAM Role ARN generated in Phase 1.
+1. **GitHub Actions YAML:** Open `.github/workflows/main-apply.yml`, `.github/workflows/pr-plan.yml`, and `.github/workflows/teardown.yaml`. Update the `role-to-assume` parameter with the IAM Role ARN generated in Phase 1.
 
-2. **Backend Configuration:** Update env/dev/backend.tf and env/prod/backend.tf to point to the exact S3 bucket and DynamoDB table you created in Phase 1.
+2. **Backend Configuration:** Update `env/dev/backend.tf` and `env/prod/backend.tf` to point to the exact S3 bucket and DynamoDB table you created in Phase 1.
 
 ### Phase 3: Verify the Application:
 
-Once CodeDeploy finishes, extract the public IP of your EC2 instance from the Terraform outputs or the AWS Console. Visit it in your browser (http://<EC2_PUBLIC_IP>) to see your zero-knowledge database secret retrieved live!
+Extract the public IP of your EC2 instance from the Terraform outputs or the AWS Console. Visit it in your browser (`http://<EC2_PUBLIC_IP>`) to see your zero-knowledge database secret retrieved live!
 
 ---
 
