@@ -206,7 +206,7 @@ Before GitHub Actions can deploy your infrastructure, it needs a legal identity 
    > `"token.actions.githubusercontent.com:sub" = "repo:<YOUR_GITHUB_USERNAME>/<YOUR_REPOSITORY_NAME>:*"`
 
 2. **Establish the OIDC Trust Bridge:**
-   Navigate to the bootstrap directory and apply the configuration to create the GitHub Actions IAM Role, the S3 Bucket with versioning enabled and DynamoDB with state locking:
+   Navigate to the bootstrap directory and apply the configuration to create the GitHub Actions IAM Role and the S3 Bucket:
    ```bash
    cd tf-boostrap-backend
    terraform init
@@ -219,7 +219,7 @@ Because OIDC relies on AWS-side trust policies rather than hidden keys, no GitHu
 
 1. **GitHub Actions YAML:** Open .github/workflows/main-apply.yml and .github/workflows/pr-plan.yml. Update the role-to-assume parameter with the IAM Role ARN generated in Phase 1.
 
-2. Backend Configuration: Update env/dev/backend.tf and env/prod/backend.tf to point to the exact S3 bucket and DynamoDB table you created in Phase 1.
+2. **Backend Configuration:** Update env/dev/backend.tf and env/prod/backend.tf to point to the exact S3 bucket and DynamoDB table you created in Phase 1.
 
 ### Phase 3: Verify the Application:
 
