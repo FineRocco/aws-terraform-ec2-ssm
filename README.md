@@ -113,7 +113,7 @@ When a developer merges code into the `main` branch, `.github/workflows/main-app
 
 ### Phase 1: Continuous Integration & Infrastructure (GitHub Actions)
 1. **OIDC Authentication:** The runner securely assumes the `GitHubActionsRole` in AWS via OpenID Connect.
-2. **Infrastructure IaC Gate:** Terraform initializes the remote backend (utilizing native S3 state locking, eliminating the need for legacy DynamoDB tables) and applies infrastructure changes (`-auto-approve`).
+2. **Infrastructure IaC Gate:** Terraform initializes the remote backend (utilizing S3 state locking with DynamoDB tables) and applies infrastructure changes (`-auto-approve`).
 3. **Variable Extraction:** The pipeline uses `terraform output -raw` to dynamically scrape the newly generated EC2 Instance ID, RDS Endpoint, and ECR Repository URL directly from the active state file.
 4. **Artifact Compilation:** The lightweight Python/Flask Docker image is built, tagged, and pushed to Amazon ECR.
 5. **SSM Execution Trigger:** Instead of zipping artifacts or relying on deployment agents to pull data, GitHub Actions packages the deployment instructions and dynamic variables into a strictly formatted JSON payload, pushing the command directly to the EC2 instance via `aws ssm send-command`.
